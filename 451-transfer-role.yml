@@ -1,0 +1,11 @@
+---
+- name:  Deploy FFACE 451 standard version WITH transfer ss451_easy.run
+  hosts:  all
+
+  #pre_tasks:
+
+  roles:
+    - role: 451-transfer
+
+  #post_tasks:
+      

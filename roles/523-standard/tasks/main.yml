@@ -1,0 +1,746 @@
+# - name: Transfer easy.run
+#   synchronize:
+#     src: "{{ ss_local_path }}"
+#     dest: /home/{{ansible_user}}/
+#     partial: yes
+#     checksum: yes
+
+# - name: run
+#   shell: bash ss523_easy.run
+#   become: yes
+
+- name: unzip encrypted zip
+  unarchive:
+    src: /install/install.zip
+    dest: /home/{{ ansible_user }}/
+    remote_src: yes
+    extra_opts:
+    - "-P"
+    - "detect123-Zaq"
+    - "-o"
+  become: yes
+
+- name: Chown -R {{ ansible_user }}:{{ ansible_user }} ff523
+  file:
+    dest=/home/{{ ansible_user }}/ff523
+    owner={{ ansible_user }}
+    recurse=yes
+  become: yes
+
+- shell: cat /proc/cpuinfo | if grep -q avx2;then echo AVX_OK;else echo AVX_NO;perl -e die;fi
+  register: cat_prc_result
+
+#    - name: Print server
+#      debug:
+#        var: cat_prc_result
+
+- name: Example using fail and when together AVX2
+  fail:
+    msg: PC does not contain AVX2, further execution is not possible
+  when: cat_prc_result == "AVX_OK"
+
+- shell: lsb_release -a| if grep -q bionic;then echo BOBR;else echo ZEBRA;perl -e die;fi
+  register: lsb_rel_result
+
+- name: Example using fail and when together BIONIC
+  fail:
+    msg: PC does not contain AVX2, further execution is not possible
+  when: lsb_rel_result == "bionic"
+
+- name: Systemctl disable, mask sleep.target
+  systemd:
+    name: sleep.target
+    enabled: no
+    masked: yes
+    state: stopped
+  become: yes
+
+- name: Systemctl disable, mask suspend.target
+  systemd:
+    name: suspend.target
+    enabled: no
+    masked: yes
+    state: stopped
+  become: yes
+
+- name: Systemctl disable, mask hibernate.target
+  systemd:
+    name: hibernate.target
+    enabled: no
+    masked: yes
+    state: stopped
+  become: yes
+
+- name: Systemctl disable, mask hybrid-sleep.target
+  systemd:
+    name: hybrid-sleep.target
+    enabled: no
+    masked: yes
+    state: stopped
+  become: yes
+
+- name: Systemctl disable, mask apport.service
+  systemd:
+    name: apport
+    enabled: no
+    masked: yes
+    state: stopped
+  become: yes
+
+- name: sudo systemctl stop, disable apt-daily.timer
+  systemd:
+    name: apt-daily.timer
+    enabled: no
+    masked: yes
+    state: stopped
+  become: yes
+
+- name: sudo systemctl stop, disable apt-daily.service
+  systemd:
+    name: apt-daily.service
+    enabled: no
+    masked: yes
+    state: stopped
+  become: yes
+
+- name: sudo systemctl stop, disable apt-daily-upgrade.timer
+  systemd:
+    name: apt-daily-upgrade.timer
+    enabled: no
+    masked: yes
+    state: stopped
+  become: yes
+
+- name: sudo systemctl stop, disable apt-daily-upgrade.service
+  systemd:
+    name: apt-daily-upgrade.service
+    enabled: no
+    masked: yes
+    state: stopped
+  become: yes
+
+- name: sync files
+  synchronize:
+    src: ff523
+    dest: /home/{{ansible_user}}/ff523/
+    partial: yes
+
+- name: cp /etc/apt/sources.list ~/sources.list.bak
+  copy:
+    src: /etc/apt/sources.list
+    dest: /home/{{ansible_user}}/sources.list.bak
+    remote_src: yes
+  ignore_errors: True
+
+- name: rm sources
+  shell: rm /etc/apt/sources.list.d/*
+  become: yes
+  ignore_errors: True
+
+
+- name: Remove update-manager-core (Apt purge -y update-manager-core)
+  apt:
+    name: update-manager-core
+    state: absent
+  become: yes
+
+- name: cp ~/ff523/ff523-repo /var/lib/ff523-repo
+  copy:
+    src: /home/{{ansible_user}}/ff523/ff523-repo
+    dest: /var/lib
+    remote_src: yes
+  become: yes
+
+
+- name: Remove file ~/ff523/ff523-repo
+  file:
+    path: /home/{{ansible_user}}/ff523/ff523-repo
+    state: absent
+  become: yes
+
+- name: Remove file (sources.list)
+  file:
+    path: /etc/apt/sources.list
+    state: absent
+  become: yes
+  ignore_errors: True
+
+- name: remove directory /etc/apt/sources.list.d
+  file:
+    path: /etc/apt/sources.list.d
+    state: absent
+  become: yes
+  ignore_errors: True
+
+- name: Create a directory /etc/apt/sources.list.d
+  file:
+    path: /etc/apt/sources.list.d
+    state: directory
+  become: yes
+  ignore_errors: True
+
+- name: add repositories или cp ff523.list /etc/apt/sources.list.d/
+  apt_repository:
+    repo: "{{ item.repo }}"
+    filename: "{{ item.filename }}"
+    state: present
+    #update_cache: yes
+  with_items:
+    - { repo: "deb [trusted=yes] file:///var/lib/ff523-repo ./", filename: "ff523.list" }
+  become: yes
+  ignore_errors: yes
+
+- name: get list
+  shell: ls -d /var/lib/ff523-repo/* | grep -E "findface-data|findface-repo"
+  register: result
+
+- name: Dpkg install packeges system findface
+  apt:
+    deb: "{{ item }}"
+  with_items: "{{result.stdout_lines}}"
+  become: yes
+  ignore_errors: True
+
+# - name: install findface deb packeges
+#   apt:
+#     deb: "{{ item }}"
+#   with_items:
+#     - /var/lib/ff523-repo/findface-counter_4.5.0.1_amd64.deb
+#     - /var/lib/ff523-repo/findface-data-age.v2-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-age.v2-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-alonso-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-alonso-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-andariel-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-andariel-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-beard.v0-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-beard.v0-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-cadet-efreitor-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-cadet-efreitor-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-carattr-description.v0-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-carattr-description.v0-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-carattr-license-plate-quality.v0-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-carattr-license-plate-quality.v0-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-carattr-license-plate.v4-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-carattr-license-plate.v4-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-carattr-quality.v0-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-carattr-quality.v0-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-carattr-special-types.v0-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-carattr-special-types.v0-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-detector-cheetah-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-detector-cheetah-fast-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-detector-cheetah-fast-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-detector-cheetah-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-detector-mtcnn-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-emotions.v1-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-emotions.v1-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-gender.v2-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-gender.v2-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-glasses3.v0-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-glasses3.v0-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-kiwi-160-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-kiwi-160-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-kiwi-320-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-kiwi-320-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-liveness-colombo-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-liveness-colombo-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-liveness-pacs.v0-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-liveness-pacs.v0-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-liveness.alleyn.v2-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-medmask3.v2-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-medmask3.v2-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-normalization-anaferon.v3-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-normalization-anaferon.v3-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-normalization-ant.v2-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-normalization-bee-fast-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-normalization-bee-fast-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-normalization-bee.v2-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-normalization-bee.v2-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-normalization-crop1x.v2-maxsize400-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-normalization-crop1x.v2-maxsize400-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-normalization-crop2x.v2-maxsize400-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-normalization-crop2x.v2-maxsize400-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-normalization-crop2x.v2-no-maxsize-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-normalization-crop2x.v2-no-maxsize-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-normalization-cropbbox.v2-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-normalization-cropbbox.v2-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-pedattr-clothes-type.v0-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-pedattr-clothes-type.v0-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-pedattr-color.v1-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-pedattr-color.v1-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-pedattr-quality.v0-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-pedattr-quality.v0-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-pedet-edie-rc2-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-pedet-glenn-005-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-pedet-glenn-005-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-pedet-glenny-005-fast-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-pedet-glenny-005-fast-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-quality.v1-cpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-data-quality.v1-gpu_3.0.0_all.deb
+#     - /var/lib/ff523-repo/findface-extraction-api_4.5.0.1_amd64.deb
+#     - /var/lib/ff523-repo/findface-facerouter_4.5.0.1-1_all.deb
+#     - /var/lib/ff523-repo/findface-ntls_4.5.0.1_amd64.deb
+#     - /var/lib/ff523-repo/findface-repo.deb
+#     - /var/lib/ff523-repo/findface-sf-api_4.5.0.1_amd64.deb
+#     - /var/lib/ff523-repo/findface-video-manager_4.5.0.1_amd64.deb
+#     - /var/lib/ff523-repo/findface-video-worker-cpu_4.5.0.1_amd64.deb
+#   become: yes
+  #ignore_errors: True
+
+
+- name: Apt -y --fix-broken install
+  shell: apt -y --fix-broken install
+  become: yes
+  ignore_errors: True
+
+- name: Run the equivalent of "apt-get update" as a separate step
+  apt:
+    update_cache: yes
+  become: yes
+  ignore_errors: True
+
+- name: install basic packages
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - findface-facerouter
+    - findface-sf-api
+    - findface-video-manager
+    - findface-video-worker-cpu
+    - etcd
+    - memcached
+    - findface-extraction-api
+    - findface-counter
+    - python3-motor
+    - ffmpeg
+#        - findface-ntls
+    - openssh-server
+    - htop
+    - ntp
+  become: yes
+
+- name: install basic packages
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - curl
+    - byobu
+    - jq
+    - vim
+  become: yes
+  ignore_errors: True
+
+- name: Copy file - cp unlift.service /etc/systemd/system/
+  copy:
+    src: /home/{{ ansible_user }}/ff523/unlift.service
+    dest: /etc/systemd/system/
+    remote_src: yes
+  become: yes
+  #ignore_errors: True
+
+- name: Copy file - cp unlift-updater.service /etc/systemd/system/
+  copy:
+    src: /home/{{ ansible_user }}/ff523/unlift-updater.service
+    dest: /etc/systemd/system/
+    remote_src: yes
+  become: yes
+  #ignore_errors: True
+
+- name: Create a directory if it does not exist #(Права!!?)
+  file:
+    path: /opt/unlift/unlift_proxy
+    state: directory
+    mode: '0755'
+  become: yes
+
+- name: Create a directory if it does not exist #(Права!!?)
+  file:
+    path: /opt/unlift/unlift_updater
+    state: directory
+    mode: '0755'
+  become: yes
+
+- name: Copy file - sudo cp updater.py /opt/unlift/unlift_updater/updater.py
+  copy:
+    src: /home/{{ ansible_user }}/ff523/updater.py
+    dest: /opt/unlift/unlift_updater/updater.py
+    remote_src: yes
+  become: yes
+
+- name: Copy file - sudo cp unlift3.py /opt/unlift/unlift_proxy/unlift.py
+  copy:
+    src: /home/{{ ansible_user }}/ff523/unlift3.py
+    dest: /opt/unlift/unlift_proxy/unlift.py
+    remote_src: yes
+  become: yes
+
+- name: Copy file - sudo cp unlift.ini /etc/
+  copy:
+    src: /home/{{ ansible_user }}/ff523/unlift.ini
+    dest: /etc/unlift.ini
+    remote_src: yes
+  become: yes
+
+- name: Cp unlift_updater.ini /etc/unlift-updater.ini
+  copy:
+    src: /home/{{ ansible_user }}/ff523/unlift_updater.ini
+    dest: /etc/unlift-updater.ini
+    remote_src: yes
+  become: yes
+
+- name: Create a directory /etc/unlift_plugins/
+  file:
+    path: /etc/unlift_plugins/
+    state: directory
+  become: yes
+
+- name: Cp unlift-plugin.py /etc/unlift_plugins/
+  copy:
+    src: /home/{{ ansible_user }}/ff523/unlift-plugin.py
+    dest: /etc/unlift_plugins/unlift-plugin.py
+    remote_src: yes
+  become: yes
+
+- name: Chmod 755 /etc/unlift_plugins/unlift-plugin.py
+  file:
+    path: /etc/unlift_plugins/unlift-plugin.py
+    mode: '0755'
+  become: yes
+
+- name: Cp findface-extraction-api.ini /etc/findface-extraction-api.ini
+  copy:
+    src: /home/{{ ansible_user }}/ff523/findface-extraction-api.ini
+    dest: /etc/findface-extraction-api.ini
+    remote_src: yes
+  become: yes
+
+- name: Cp findface-video-worker-cpu.ini /etc/findface-video-worker-cpu.ini
+  copy:
+    src: /home/{{ ansible_user }}/ff523/findface-video-worker-cpu.ini
+    dest: /etc/findface-video-worker-cpu.ini
+    remote_src: yes
+  become: yes
+
+- name: Cp findface-video-manager.conf /etc/findface-video-manager.conf
+  copy:
+    src: /home/{{ ansible_user }}/ff523/findface-video-manager.conf
+    dest: /etc/findface-video-manager.conf
+    remote_src: yes
+  become: yes
+
+- name: Chown root:ntech /etc/findface-video-manager.conf
+  file:
+    path: /etc/findface-video-manager.conf
+    owner: root
+    group: ntech
+  become: yes
+
+- name: Cp findface-sf-api.ini /etc/findface-sf-api.ini
+  copy:
+    src: /home/{{ ansible_user }}/ff523/findface-sf-api.ini
+    dest: /etc/findface-sf-api.ini
+    remote_src: yes
+  become: yes
+
+- name: Cp findface-facerouter.py /etc/findface-facerouter.py
+  copy:
+    src: /home/{{ ansible_user }}/ff523/findface-facerouter.py
+    dest: /etc/findface-facerouter.py
+    remote_src: yes
+  become: yes
+
+- name: Create a directory /opt/unlift/samples
+  file:
+    path: /opt/unlift/samples
+    state: directory
+  become: yes
+
+- name: Cp sample.mp4 /opt/unlift/samples/
+  copy:
+    src: /home/{{ ansible_user }}/ff523/sample.mp4
+    dest: /opt/unlift/samples/sample.mp4
+    remote_src: yes
+  become: yes
+
+- name: Cp ~/ff523/warning.mp3 /opt/unlift/unlift_proxy/
+  copy:
+    src: /home/{{ ansible_user }}/ff523/warning.mp3
+    dest: /opt/unlift/unlift_proxy/warning.mp3
+    remote_src: yes
+  become: yes
+
+- name: Cp ~/ff523/warningf.mp3 /opt/unlift/unlift_proxy/
+  copy:
+    src: /home/{{ ansible_user }}/ff523/warningf.mp3
+    dest: /opt/unlift/unlift_proxy/warningf.mp3
+    remote_src: yes
+  become: yes
+
+- name: cp ~/ff523/notice.mp3 /opt/unlift/unlift_proxy/
+  copy:
+    src: /home/{{ ansible_user }}/ff523/notice.mp3
+    dest: /opt/unlift/unlift_proxy/notice.mp3
+    remote_src: yes
+  become: yes
+
+- name: cp memcached.conf /etc/memcached.conf
+  copy:
+    src: /home/{{ ansible_user }}/ff523/memcached.conf
+    dest: /etc/
+    remote_src: yes
+  become: yes
+
+- name: SED unlift.ini
+  replace:
+    path: /etc/unlift.ini
+    regexp: 'unlift_token=.*'
+    replace: 'unlift_token={{token}}'
+  become: yes
+
+- name: SED unlift-updater.ini
+  replace:
+    path: /etc/unlift-updater.ini
+    regexp: 'unlifttoken=.*'
+    replace: 'unlifttoken={{token}}'
+  become: yes
+
+- name: SED findface-video-worker-cpu.ini
+  replace:
+    path: /etc/findface-video-worker-cpu.ini
+    regexp: 'ntls_addr.*'
+    replace: 'ntls_addr = {{license_ntls_server }}'
+  become: yes
+
+- name: SED findface-extraction-api.ini
+  replace:
+    path: /etc/findface-extraction-api.ini
+    regexp: 'license_ntls_server:.*'
+    replace: 'license_ntls_server: {{ license_ntls_server }}'
+  become: yes
+
+
+# sudo sed -i -e "s/ant/bee/g" -e "s/mtcnn/cheetah/g" /etc/findface-video-worker-cpu.ini
+# sudo sed -i "s/face2.bit-tech.co/face4.bit-tech.co/g" /etc/findface-sf-api.ini
+
+
+  
+# - name: enable & restart services
+#   systemd:
+#     name: '{{ item }}'
+#     enabled: yes
+#     masked: no
+#     state: restarted
+#   with_items:
+#     - unlift
+#     - unlift-updater
+#     - findface-facerouter
+#     - findface-extraction-api
+#     - findface-sf-api
+#     - etcd
+#     - memcached
+#     - findface-video-manager
+#     - findface-video-worker-cpu
+#   become: yes
+
+- name: Enable unlift.service && sudo systemctl start unlift
+  systemd:
+    name: unlift
+    enabled: yes
+    masked: no
+    state: restarted
+  become: yes
+  ignore_errors:  yes
+
+- name: Enable unlift-updater.service && sudo systemctl start unlift-updater
+  systemd:
+    name: unlift-updater
+    enabled: yes
+    masked: no
+    state: restarted
+  become: yes
+
+- name: Enable findface-facerouter.service && sudo systemctl start findface-facerouter.service
+  systemd:
+    name: findface-facerouter
+    enabled: yes
+    masked: no
+    state: started
+  become: yes
+
+- name: Enable findface-extraction-api.service && sudo systemctl start findface-extraction-api.service
+  systemd:
+    name: findface-extraction-api.service
+    enabled: yes
+    masked: no
+    state: restarted
+  become: yes
+
+- name: Enable findface-sf-api.service && sudo systemctl start findface-sf-api.service
+  systemd:
+    name: findface-sf-api
+    masked: no
+    enabled: yes
+    state: restarted
+  become: yes
+
+- name: Enable findface-facerouter.service && sudo systemctl start findface-facerouter.service
+  systemd:
+    name: findface-facerouter
+    enabled: yes
+    masked: no
+    state: restarted
+  become: yes
+
+- name: Enable etcd.service && sudo systemctl start etcd.service
+  systemd:
+    name: etcd.service
+    enabled: yes
+    masked: no
+    state: started
+  become: yes
+
+- name: Enable findface-video-manager.service && sudo systemctl start findface-video-manager.service
+  systemd:
+    name: findface-video-manager
+    enabled: yes
+    masked: no
+    state: started
+  become: yes
+
+- name: Replace skip_count
+  ansible.builtin.replace:
+    path: /etc/findface-video-worker-cpu.ini
+    regexp: 'skip_count = .*'
+    replace: 'skip_count = {{ skip }}'
+  become: yes
+  when: skip is defined
+
+# - name: Enable findface-video-worker-cpu.service && sudo systemctl start findface-video-worker-cpu.service
+#   systemd:
+#     name: findface-video-worker-cpu
+#     enabled: yes
+#     masked: no
+#     state: restarted
+#   become: yes
+
+- name: sed -i '$a sound=True' /etc/unlift.ini
+  lineinfile:
+    path: /etc/unlift.ini
+    line: 'sound=True'
+    insertafter: EOF
+    backup: yes
+  become: yes
+
+- name: sed -i '$a disable_ssl=True' /etc/unlift.ini
+  lineinfile:
+    path: /etc/unlift.ini
+    line: 'disable_ssl=True'
+    insertafter: EOF
+    backup: yes
+  become: yes
+
+- name: sed -i '$a disable_ssl=True' /etc/unlift-updater.ini
+  lineinfile:
+    path: /etc/unlift-updater.ini
+    line: 'disable_ssl=True'
+    insertafter: EOF
+    backup: yes
+  become: yes
+
+# sudo systemctl enable findface-ntls.service && sudo systemctl start findface-ntls.service
+
+- name: Copy file - mv /etc/ntp.conf /etc/ntp.conf.bak
+  copy:
+    src: /etc/ntp.conf
+    dest: /etc/ntp.conf.bak
+    remote_src: yes
+  become: yes
+  ignore_errors: True
+
+- name: echo "server ntp1" | sudo tee /etc/ntp.conf
+  shell: echo "server {{timesrv}}" | sudo tee /etc/ntp.conf
+  become: yes
+
+- name: echo "server 1.pool.ntp.org" | sudo tee -a /etc/ntp.conf
+  shell: echo "server 1.pool.ntp.org" | sudo tee -a /etc/ntp.conf
+  become: yes
+
+- name: sudo service timesyncd stop
+  service:
+    name: systemd-timesyncd
+    state: stopped
+    enabled: no
+  become: yes
+
+- name: sudo service ntp restart
+  service:
+    name: ntp
+    state: restarted
+    enabled: yes
+  become: yes
+
+- name: sudo systemctl restart unlift-updater.service
+  service:
+    name: unlift-updater.service
+    state: restarted
+  become: yes
+
+- name: clean
+  shell: 'rm -rf ff* ss* bit* alert* dot* *sh'
+
+- name: Create task on cron
+  cron:
+    name: reboot unlift
+    special_time: hourly
+    user: root
+    job: 'grep "$(LC_ALL=C date -d 1\ hour\ ago +\%b\ \%e\ \%H:)" /var/log/syslog|grep -q "Too many"&&logger "unlift is dead, reboot"&&reboot'
+    state: present
+  become: yes
+
+- name: Create task on cron
+  cron:
+    name: reboot unlift2
+    special_time: hourly
+    user: root
+    job: 'grep "$(LC_ALL=C date -d 1\ hour\ ago +\%b\ \%e\ \%H:)" /var/log/syslog|grep -q "sqlite3.OperationalError: database is locked" &&logger "unlift is locked, reboot"&&reboot'
+    state: present
+  become: yes
+
+- name: Create task on cron
+  cron:
+    name: restart unlift
+    special_time: hourly
+    user: root
+    job: 'systemctl status unlift --no-pager --lines=0|grep -q ffmpeg&&logger "unlift is stuck, restart service"&&systemctl restart unlift'
+    state: present
+  become: yes
+
+- name: set sysctl
+  ansible.posix.sysctl:
+    name: "vm.swappiness"
+    value: "1"
+    state: present
+    sysctl_set: true
+    reload: true
+  become: yes
+
+- name: Create task on cron
+  cron:
+    name: check
+    special_time: hourly
+    user: root
+    job: 'python3 /opt/unlift/unlift_proxy/unlift_diag.py -c /etc/unlift.ini|logger'
+    state: present
+  become: yes
+
+- name: SED 
+  replace:
+    path: /etc/default/grub
+    regexp: 'GRUB_CMDLINE_LINUX_DEFAULT=.*'
+    replace: 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash fsck.mode=force fsck.repair=yes"'
+  become: yes
+
+- name: update grub
+  shell: sudo update-grub
+  become: yes

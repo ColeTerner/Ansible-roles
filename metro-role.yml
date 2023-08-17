@@ -1,0 +1,11 @@
+---
+- name:  Deploy FFACE at metro's store
+  hosts:  all
+
+  #pre_tasks:
+
+  roles:
+    - role: metro
+
+  #post_tasks:
+      

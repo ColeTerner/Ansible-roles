@@ -1,0 +1,11 @@
+ansible_user: detect
+become-user:  root
+ansible_password: detect-pwd
+ansible_become_pass:  detect-pwd
+ansible_sudo_pass:  detect-pwd
+license_ntls_server:  face452k.bit-tech.co:3155
+ansible_python_interpreter: /usr/bin/python3
+timesrv:  89.109.251.21
+skip: 1
+NTP_Port: 123
+NTP_UpdatePeriod: 5

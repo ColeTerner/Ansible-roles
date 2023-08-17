@@ -1,0 +1,11 @@
+---
+- name:  Deploy FFACE 451 standard version(without transfer)
+  hosts:  all
+
+  #pre_tasks:
+
+  roles:
+    - role: 451-standard
+
+  #post_tasks:
+      

@@ -1,0 +1,12 @@
+[all]
+10.239.25.149 token=' dd0763d6bd '
+[all:vars]
+ansible_user=detect
+become-user=root
+ansible_password=detect-pwd
+ansible_become_pass=detect-pwd
+ansible_sudo_pass=detect-pwd
+license_ntls_server=face452k.bit-tech.co:3144
+ansible_python_interpreter=/usr/bin/python3
+timesrv=0.pool.ntp.org
+skip=1

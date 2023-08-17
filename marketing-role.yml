@@ -1,0 +1,11 @@
+---
+- name:  Deploy alert for Linux 1.1.0.0
+  hosts:  all
+
+  #pre_tasks:
+
+  roles:
+    - role: marketing
+
+  #post_tasks:
+      

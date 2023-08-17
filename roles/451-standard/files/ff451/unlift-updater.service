@@ -1,0 +1,14 @@
+[Unit]
+Description=unlift updater
+
+[Service]
+WorkingDirectory=/opt/unlift/unlift_updater
+ExecStart=/usr/bin/python3 /opt/unlift/unlift_updater/updater.py -c /etc/unlift-updater.ini
+StandardOutput=syslog
+StandardError=syslog
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+

@@ -1,0 +1,71 @@
+- name: grep FF-video-worker version
+  shell: dpkg -l | grep findface-video-worker | awk '{print $3}'
+  register: ff_version
+  become: yes
+- debug: var=ff_version.stdout
+
+#- name: Checking RAM of PC
+#  assert:
+#    that:
+#      - ff_version.stdout == '4.5.0.1'
+#    fail_msg: "Findface version is already updated to {{ ff_version.stdout }}"
+  
+
+- name: sync files
+  synchronize:
+    src: findface-repo.deb
+    dest: /home/{{ansible_user}}/
+    partial: yes
+
+- name: Get Kernel version
+  shell: uname -r
+  register: kernel_shell_output
+
+- debug: msg="{{ kernel_shell_output.stdout}}"
+
+- name: Hold Kernel version
+  shell: sudo apt-mark hold {{ kernel_shell_output.stdout}}
+  become: yes
+
+- name: Get Hold status
+  shell: dpkg -l|grep linux|grep "^hi"
+  register: hold
+
+- debug: msg="{{ hold.stdout}}"
+
+- name: install deb
+  apt:
+    deb: /home/{{ansible_user}}/findface-repo.deb
+  become: yes
+  ignore_errors: True
+
+- name: Update apt-get repo and cache
+  apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+  become: yes
+
+- name: install basic packages
+  apt:
+    name: "{{ item }}"
+    state: latest
+    only_upgrade: true
+    install_recommends: yes
+  loop:
+    - findface-facerouter
+    - findface-sf-api
+    - findface-video-manager
+    - findface-video-worker-cpu
+    - findface-video-worker-gpu
+    - etcd
+    - memcached
+    - findface-extraction-api
+    - python3-motor
+    - ffmpeg
+    - htop
+    - ntp
+  become: yes
+  ignore_errors: yes
+
+- name: Reboot the server.
+  reboot:
+    reboot_timeout: 3600
+  become: yes

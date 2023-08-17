@@ -1,0 +1,35 @@
+- name: Check kernel version
+  shell: uname -r
+  register: kernel
+- debug:  var=kernel.stdout
+
+- name: if kernel varsion is already installed -> failed
+  fail:
+    msg:  "KERNEL 5.11 IS ALREADY INSTALLED!!!"
+  when: kernel.stdout == '5.11.0-40-generic'
+
+- name: Transfer 5.11.zip
+  synchronize:
+    archive:  false
+    src: 5.11.zip
+    dest: /home/{{ansible_user}}/
+    partial: yes
+
+- name: unarchive 5.11.zip
+  unarchive:
+    src:  /home/{{ ansible_user }}/5.11.zip
+    dest: /home/{{ ansible_user }}/
+    remote_src: yes
+
+- name: Install everything within 5.11
+  shell:  "dpkg -i 5.11/*"
+  become: yes
+
+- name: reboot
+  reboot:
+  become: yes
+
+- name: Check kernel version
+  shell: uname -r
+  register: new_kernel
+- debug:  var=new_kernel.stdout

@@ -1,0 +1,12 @@
+[Unit]
+Description=unlift proxy
+
+[Service]
+WorkingDirectory=/opt/unlift/unlift_proxy
+ExecStart=/usr/bin/python3 /opt/unlift/unlift_proxy/unlift.py -c /etc/unlift.ini
+StandardOutput=syslog
+StandardError=syslog
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

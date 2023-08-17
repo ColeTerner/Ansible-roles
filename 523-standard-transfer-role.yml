@@ -1,0 +1,11 @@
+---
+- name:  Deploy FFACE 523 standard CPU version(with transfer)
+  hosts:  all
+
+  #pre_tasks:
+
+  roles:
+    - role: 523-standard-transfer
+
+  #post_tasks:
+      

@@ -1,0 +1,11 @@
+---
+- name:  Install BIT-ALERT
+  hosts:  all
+
+  #pre_tasks:
+
+  roles:
+    - role: bit-alert
+
+  #post_tasks:
+      

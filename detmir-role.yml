@@ -1,0 +1,188 @@
+---
+- name:  Deploy FFACE at detmir's store
+  hosts:  all
+  pre_tasks:
+    - name: ping 1.1.1.1
+      shell:  ping -c 4 1.1.1.1
+      register: ping_dns
+    - debug:  var=ping_dns.stdout_lines
+    
+    - nmcli:
+        conn_name: Wired connection 1
+        type: ethernet
+        dns4:
+          - 77.88.8.88
+          - 1.1.1.1
+        state: present
+      become: yes
+      ignore_errors: True
+
+    - nmcli:
+        conn_name: Wired connection 2
+        type: ethernet
+        dns4:
+          - 77.88.8.88
+          - 1.1.1.1
+        state: present
+      become: yes
+      ignore_errors: True
+
+    - name: dnssec
+      lineinfile:
+        path: /etc/systemd/resolved.conf
+        line: 'DNSSEC=no'
+        insertafter: EOF
+        backup: yes
+      become: yes
+
+    - name: restart resolver
+      service:
+        name: systemd-resolved.service
+        state: restarted
+      become: yes
+
+
+    - name: Add block
+      blockinfile:
+        path: /etc/hosts
+        state: present
+        insertbefore: "^127.0.0.1.*"
+        block: |
+          185.158.114.149 unlift.ru
+          5.252.193.80 face452k.bit-tech.co
+        marker: "# {mark} ANSIBLE MANAGED BLOCK"
+      become: yes
+
+    - name: Reboot a slow machine that might have lots of updates to apply
+      ansible.builtin.reboot:
+        reboot_timeout: 3600
+      become: yes
+
+    - name: repeat ansible_host
+      debug:
+        var:  ansible_host
+
+    - name: first octet
+      shell:  echo "{{ ansible_host }}" | cut -d "." -f 1
+      register: oct1
+    - debug:  var=oct1.stdout
+
+    - name: second octet
+      shell:  echo "{{ ansible_host }}" | cut -d "." -f 2
+      register: oct2
+    - debug:  var=oct2.stdout
+    
+    - name: third octet
+      shell:  echo "{{ ansible_host }}" | cut -d "." -f 3
+      register: oct3
+    - debug:  var=oct3.stdout
+
+    - name: forth octet
+      shell:  echo "{{ ansible_host }}" | cut -d "." -f 4
+      register: oct4
+    - debug:  var=oct4.stdout
+
+    - name: ffmpeg check TRASSIR
+      shell:  'ffmpeg -y -i "rtsp://admin:Admin12345@{{ oct1.stdout }}.{{ oct2.stdout }}.{{ oct3.stdout }}.{{ item }}/live/main" -vframes 1 -q:v 2 sample_fram1.jpg'
+      async:  0.1
+      with_items:
+        - "{{ oct4.stdout | int + 1 }}"
+        - "{{ oct4.stdout | int + 2 }}"
+        - "{{ oct4.stdout | int + 3 }}"
+        - "{{ oct4.stdout | int + 4 }}"
+        - "{{ oct4.stdout | int + 5 }}"
+      ignore_errors:  yes
+      become: yes
+
+
+    - name: ffmpeg check DAHUA
+      shell:  'ffmpeg -y -i "rtsp://admin:Admin12345@{{ oct1.stdout }}.{{ oct2.stdout }}.{{ oct3.stdout }}.{{ item }}/cam/realmonitor?channel=1&subtype=0" -vframes 1 -q:v 2 sample_fram1.jpg'
+      async:  0.1
+      with_items:
+        - "{{ oct4.stdout | int + 1 }}"
+        - "{{ oct4.stdout | int + 2 }}"
+        - "{{ oct4.stdout | int + 3 }}"
+        - "{{ oct4.stdout | int + 4 }}"
+        - "{{ oct4.stdout | int + 5 }}"
+      ignore_errors:  yes
+      become: yes
+
+  roles:
+    - role: detmir
+
+  post_tasks:
+    - name: Repeat transferred IP
+      debug: var={{ansible_host}}
+
+    - name: Exctract last octet, grow him up and save
+      set_fact: |
+        cam1_octet={{ansible_host.split('.')[3] | int + 1 }}
+        cam2_octet={{ansible_host.split('.')[3] | int + 2 }}
+        cam3_octet={{ansible_host.split('.')[3] | int + 3 }}
+        cam4_octet={{ansible_host.split('.')[3] | int + 4 }}
+        cam5_octet={{ansible_host.split('.')[3] | int + 5 }}
+
+    - debug:
+        var:  "{{ item }}"
+      with_items:
+        - cam1_octet
+        - cam2_octet
+        - cam3_octet
+        - cam4_octet
+        - cam5_octet
+
+    - name: Set ip_cam
+      set_fact: |
+        cam1_ip="{{ ansible_host | regex_replace('(^.*\.).*$', '\\1') }}{{cam1_octet}}"
+        cam2_ip="{{ ansible_host | regex_replace('(^.*\.).*$', '\\1') }}{{cam2_octet}}"
+        cam3_ip="{{ ansible_host | regex_replace('(^.*\.).*$', '\\1') }}{{cam3_octet}}"
+        cam4_ip="{{ ansible_host | regex_replace('(^.*\.).*$', '\\1') }}{{cam4_octet}}"
+        cam5_ip="{{ ansible_host | regex_replace('(^.*\.).*$', '\\1') }}{{cam5_octet}}"
+      ignore_errors:  yes
+
+    - debug:
+        var:  "{{ item }}"
+      with_items:
+        - cam1_ip
+        - cam2_ip
+        - cam3_ip
+        - cam4_ip
+        - cam5_ip
+
+    - name: Set NTP.Enable, NTP.address, NTP.port, NTP.UpdatePeriod
+      shell:  |
+        curl -g --anyauth --user 'admin:Admin12345' 'http://{{ item }}/cgi-bin/configManager.cgi?action=setConfig&NTP.Enable=true'
+        curl -g --anyauth --user 'admin:Admin12345' 'http://{{ item }}/cgi-bin/configManager.cgi?action=setConfig&NTP.Address={{ ansible_host }}'
+        curl -g --anyauth --user 'admin:Admin12345' 'http://{{ item }}/cgi-bin/configManager.cgi?action=setConfig&NTP.Port={{ NTP_Port }}'
+        curl -g --anyauth --user 'admin:Admin12345' 'http://{{ item }}/cgi-bin/configManager.cgi?action=setConfig&NTP.UpdatePeriod={{ NTP_UpdatePeriod }}'
+      with_items:
+        - "{{ cam1_ip }}"
+        - "{{ cam2_ip }}"
+        - "{{ cam3_ip }}"
+        - "{{ cam4_ip }}"
+        - "{{ cam5_ip }}"  
+      ignore_errors:  yes
+      
+    - name: Get white IP for balancer
+      shell:  curl -s http://5.252.193.80/forwarded/|cut -d "," -f1
+      register: white_ip
+    - debug:  var=white_ip.stdout
+    
+    - name: reset facts
+      set_fact:
+        ansible_host: 5.252.193.80
+        ansible_user: fface
+        ansible_password: 'fface-pwd1902'
+        ansible_become_pass:  'fface-pwd1902'
+        ansible_sudo_pass:  'fface-pwd1902'
+
+    - name: Set white_ip into firewall exclusion
+      shell:  sudo ufw allow from {{ white_ip.stdout }} to any port 3133:3184,8101:8108 proto tcp
+      register: rule
+      become: yes
+    - debug:  var=rule.stdout
+    
+    
+
+
+    

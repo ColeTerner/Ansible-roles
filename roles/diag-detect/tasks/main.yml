@@ -1,0 +1,181 @@
+#1)Checking RAM
+- name: Checking RAM of PC
+  assert:
+    that:
+      - ansible_memtotal_mb | int >=14000
+    fail_msg: "Memory is probably 8 GB or LESS. Only pray can help!"
+  ignore_errors: yes
+
+#2)Linux Release
+- name: Get Linux release
+  shell:  uname -a | awk '{print $2,$3,$4}'
+  register: kernel
+
+#Print Linux release
+- name: Print Linux release
+  debug: |
+    msg="Linux release - {{kernel.stdout}}"
+
+#3)VIDEOCARD
+- name: Get VIDEOCARD
+  shell:  lspci | grep VGA
+  register: videocard
+
+#Print videocard
+- name: Print VIDEOCARD
+  debug: |
+    msg="VIDEOCARD - {{videocard.stdout}}" 
+
+#4) SERVER's LOAD
+- name: Get LOAD of the system
+  shell:  cat /proc/loadavg | awk '{print $1,$2,$3}'
+  register: load
+  #when: load >= 1
+  #notify: 
+    #- reboot
+
+#Print system's load
+- name: Print LOAD of the system
+  debug: |
+    msg="SERVER's LOAD( 1m 5m 15m ) - {{load.stdout}}"
+
+#5) Check UPTIME
+- name: Check UPTIME of the server
+  shell:  uptime | awk '{print $2,$3,$4,$5}'
+  register: uptime
+
+#Print UPTIME of the server
+- name: Print UPTIME
+  debug:  |
+    msg="Uptime is - {{uptime.stdout}}"
+
+#6)Check correct TOKEN
+- name: Check TOKEN
+  shell:  cat /etc/unlift.ini | grep unlift_token | awk -F '=' '{print $2}'
+  register: token
+  become: yes
+  ignore_errors:  yes
+
+#Print current TOKEN
+- name: Print TOKEN
+  debug: |
+    msg="TOKEN is - {{token.stdout}}"
+
+#7)Check the LICENSE
+- name: Check LICENSE
+  shell:  cat /etc/findface-extraction-api.ini |grep ntls | awk -F ":" '{print $3}'
+  register: license
+  ignore_errors:  yes
+
+#Print LICENSE
+- name: Print LICENSE
+  debug: |
+    msg="LICENSE is - {{license.stdout}}"
+
+#8)Check the SWAP
+- name: Check SWAP
+  shell:  free -h | grep total | awk '{print $1,$2,$3}'; free -h | grep Swap | awk '{print $2,$3,$4}'
+  register: swap
+  ignore_errors:  yes
+
+#Print SWAP
+- name: Print SWAP
+  debug: |
+    msg="SWAP is - {{swap.stdout_lines}}"
+
+#1)Check SERVICES
+
+#Restart all Services
+- name: Check all services are started
+  systemd:
+    name: "{{ item }}"
+    state:  restarted
+    enabled:  yes
+  with_items:
+    - findface-extraction-api
+    - findface-facerouter
+    - findface-sf-api
+    - findface-video-manager
+    # - findface-video-worker-cpu
+    # - findface-video-worker-gpu
+    # - findface-counter
+    - memcached
+    - unlift
+    # - unlift-installer
+    - unlift-updater
+    - etcd
+  ignore_errors:  yes
+  become: yes
+
+- name: Check STATUS of unlift , unlift-updater services IF SHOP IS RED
+  shell:  systemctl status "{{ item }}"
+  with_items:
+    - unlift
+    - unlift-updater
+    - findface-video-worker-cpu
+    - findface-video-worker-gpu
+    - findface-extraction-api
+    - findface-facerouter
+    - findface-sf-api
+  register: service_status   #register all of cycle iteration into a single variable
+  ignore_errors:  yes
+- debug:
+    msg:  "{{ service_status.results }}"
+
+
+#2)Check status of all cameras
+
+- name: Install jq
+  apt:
+    name: jq
+    update_cache: yes
+  ignore_errors:  yes
+  become: yes
+
+- name: Check STATUS of cameras(curl)
+  shell: curl -s http://127.0.0.1:18810/jobs | jq -r '.[]|((.status)+" "+.stream_url+" posted="+(.statistic.faces_posted|tostring)+" failed="+(.statistic.faces_failed|tostring)+" not_posted="+(.statistic.faces_not_posted|tostring))'
+  register: curl
+  
+
+#Print status of cameras
+- name: Print STATUS of all cameras(posted,failed)
+  debug: |
+    msg="{{ curl.stdout }}"
+
+#3)Check work of DNS
+- name: Gather DNS response resolving google.com
+  shell:  nslookup google.com | grep answer
+  register: dns_answer
+
+#Print DNS answer
+- name: Print out DNS answer
+  debug: |
+    msg="{{ dns_answer.stdout }}"
+
+#4)BALANCER CHECK
+- name: Check balancer availability
+  shell:  nc -w1 -vz face452k.bit-tech.co 8101-8105
+  register: balance
+  ignore_errors:  yes
+- debug: msg={{balance.stderr_lines}}
+
+- name: Check unlift availability
+  shell:  nc -w1 -vz unlift.ru 443
+  register: unlift
+  ignore_errors:  yes
+- debug: msg={{unlift.stderr_lines}}
+
+
+- name: Observe ERROR in last 100 logs
+  shell:  cat /var/log/syslog | tail -n 300 | grep ERROR
+  register: logs
+  become: yes
+
+- name: Print logs
+  debug:  |
+    msg="{{logs.stdout_lines}}"
+
+- name: Get white IP for balancer
+  shell:  curl -s http://5.252.193.80/forwarded|cut -d "," -f1
+  register: white_ip
+- debug:  var=white_ip.stdout

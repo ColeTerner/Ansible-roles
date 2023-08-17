@@ -1,0 +1,9 @@
+ansible_user: detect
+become-user:  root
+ansible_password: detect-pwd
+ansible_become_pass:  detect-pwd
+ansible_sudo_pass:  detect-pwd
+ansible_python_interpreter: /usr/bin/python3
+timesrv:  0.pool.ntp.org
+skip: 1
+
